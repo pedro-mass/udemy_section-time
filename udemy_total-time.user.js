@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Udemy - show total section time
+// @name         Udemy - show section time
 // @updateURL    https://openuserjs.org/meta/pedro-mass/My_Script.meta.js
 // @namespace    http://tampermonkey.net/
-// @version      0.4
-// @description  For Udemy, adds total time to each section
+// @version      0.6
+// @description  For Udemy, displays the time a section has. It will display the total time if a section is completed or hasn't been started yet. Will display the remaining time if it's been started
 // @copyright    2017, Pedro Mass (https://github.com/pedro-mass)
 // @author       pedro-mass
 // @match        *.udemy.com/*
@@ -14,15 +14,20 @@
 // ==/UserScript==
 
 (function() {
-  // ----- todo
-  // - split up for hours
-
   var selectors = {
     sectionCard: 'curriculum-navigation-section',
+    sectionName: '.curriculum-navigation__section__title',
+
+    // class needed by this user script
+    sectionTime: '.section-time',
+
+    lectureItem: '.lecture__item',
     lectureTime: '.lecture__item__link__time',
-    lectureName: '.curriculum-navigation__section__title',
-    lectureStatus: '.cur-status'
+    lectureStatus: '.cur-status',
+    lectureCheck: '.udi-check',
   };
+
+  run();
 
   // waits for the cards to be loaded
   waitForKeyElements(selectors.sectionCard, run);
@@ -31,27 +36,87 @@
     var sections = $(selectors.sectionCard);
 
     $.each(sections, function(index, section) {
+      // remove previous time display
+      $(section).find(selectors.sectionTime).remove();
+
       // get the section title
-      var title = $(section).find(selectors.lectureName).text();
+      var title = $(section).find(selectors.sectionName).text();
+
+      // determine what times to get
+      var isPartialTime = checkPartialTime(section);
 
       // get the times
-      var timeSpans = $(section).find(selectors.lectureTime);
-      var timeTexts = convertTimeSpansToTexts(timeSpans);
+      var timeTexts = getTimeTexts(section, isPartialTime);
 
       // sum the times
-      var totalTime = sumTextTimes(timeTexts);
+      var timeToDisplay = sumTextTimes(timeTexts);
 
-      // prepend to lecture status
-      var totalTimeSpan = $(section).find(selectors.lectureStatus).find('.section-totalTime');
+      // display time
+      var label = isPartialTime ? "Remaining Time - " : "Total Time - ";
 
-      // check to see if we've already added the time to the DOM
-      if (totalTimeSpan.length > 0) {
-        $(totalTimeSpan[0]).text(totalTime);
-      } else {
-        // we haven't, so create the element and add it
-        $(section).find(selectors.lectureStatus).prepend('<span class="section-totalTime" style="margin-right:1em">'+ totalTime + '</span>');
-      }
+      displayTime(section, timeToDisplay, label);
     });
+  }
+
+  /*
+    Gets the section parts and checks if it's not 0 or the total parts
+  */
+  function checkPartialTime(section) {
+    // get the section parts
+    var sectionParts = getSectionParts(section);
+
+    // determine what times to get
+    var totalSections = sectionParts[1];
+    var sectionsToGo = sectionParts[0];
+
+    return sectionsToGo != 0 && sectionsToGo != totalSections;
+  }
+
+  /**
+    Get the section's time. Whether partial or total is determined by the passed in
+    parameter.
+  */
+  function getTimeTexts(section, isPartialTime) {
+    // get the times
+    var $lectures = $(section).find(selectors.lectureItem);
+
+    // Check for partial time
+    if (isPartialTime) {
+      // filter down to just the non-completed ones
+      $lectures = $lectures.filter(':not(.completed)');
+    }
+
+    // get the time spans
+    var timeSpans = $lectures.find(selectors.lectureTime);
+
+    // convert to timeTexts and return
+    return convertTimeSpansToTexts(timeSpans);
+  }
+
+  function displayTime(section, totalTime, label) {
+    var sectionTimeClass = 'section-time';
+
+    // prepend to lecture status
+    var totalTimeSpan = $(section).find(selectors.lectureStatus).find(sectionTimeClass);
+
+    // check to see if we've already added the time to the DOM
+    if (totalTimeSpan.length > 0) {
+      $(totalTimeSpan[0]).text(label + totalTime);
+    } else {
+      // we haven't, so create the element and add it
+      $(section).find(selectors.lectureStatus)
+        .prepend('<span class="' +  sectionTimeClass + '" style="margin-right:1em">'+ label + totalTime + '</span>');
+    }
+  }
+
+  function getSectionParts(section) {
+
+
+    return $(section).find(selectors.lectureStatus).text()
+      // split up the parts by "/"
+      .split('/')
+      // trim up the space
+      .map(function(text) { return text.trim(); });
   }
 
   function convertTimeSpansToTexts(timeSpans) {
