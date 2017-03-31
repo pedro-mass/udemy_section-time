@@ -79,7 +79,7 @@ TODO
         remainingLectureTime += partialTimeSeconds;
 
         // prepend partial time
-        textToDisplay = partialTime + ' / ' + textToDisplay
+        textToDisplay = partialTime + ' / ' + textToDisplay;
       }
 
       // check if we need to add up the total time to remaining time
@@ -92,7 +92,7 @@ TODO
     });
 
     // display lecture totals
-    return displayLectureTimeProgress(totalLectureTime, remainingLectureTime)
+    return displayLectureTimeProgress(totalLectureTime, remainingLectureTime);
   }
 
   function displayLectureTimeProgress(totalLectureTime, remainingLectureTime) {
@@ -114,11 +114,13 @@ TODO
     if (lectureProgressSpans.length > 0) {
       $(lectureProgressSpans[0]).text(displayText);
     } else {
-      $(selectors.lectureProgress).append('<span'
+      $(selectors.lectureProgress).append(
+        '<span'
         + ' class="'+ lectureProgressClass + '"'
         + ' style="margin-left: 1em;"'
         +'">'
-        + displayText + '</span>');
+        + displayText + '</span>'
+      );
     }
 
     return displayText;
