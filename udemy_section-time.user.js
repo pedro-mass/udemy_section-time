@@ -2,8 +2,8 @@
 // @name         Udemy - show section time
 // @updateURL    https://openuserjs.org/meta/pedro-mass/My_Script.meta.js
 // @namespace    http://tampermonkey.net/
-// @version      0.6
-// @description  For Udemy, displays the time a section has. It will display the total time if a section is completed or hasn't been started yet. Will display the remaining time if it's been started
+// @version      0.7
+// @description  For Udemy, displays the time a section has ( remaining time / total time).
 // @copyright    2017, Pedro Mass (https://github.com/pedro-mass)
 // @author       pedro-mass
 // @match        *.udemy.com/*
@@ -12,6 +12,11 @@
 // @require      https://greasyfork.org/scripts/5392-waitforkeyelements/code/WaitForKeyElements.js?version=115012
 // @run-at       document-idle
 // ==/UserScript==
+
+/**
+TODO
+ - figure out how to stop this script from excuting continuously
+*/
 
 (function() {
   var selectors = {
@@ -25,15 +30,25 @@
     lectureTime: '.lecture__item__link__time',
     lectureStatus: '.cur-status',
     lectureCheck: '.udi-check',
+
+    lectureProgress : 'div.detail__progress > div > div.fx > span',
   };
 
-  run();
+  // run();
 
   // waits for the cards to be loaded
-  waitForKeyElements(selectors.sectionCard, run);
+  waitForKeyElements(selectors.sectionCard, run, true);
 
+  /**
+  Gets total and remaining time for each section.
+  Displays these per section.
+  Display the total of all sections
+  */
   function run() {
     var sections = $(selectors.sectionCard);
+
+    var totalLectureTime = 0;
+    var remainingLectureTime = 0;
 
     $.each(sections, function(index, section) {
       // remove previous time display
@@ -42,20 +57,71 @@
       // get the section title
       var title = $(section).find(selectors.sectionName).text();
 
-      // determine what times to get
-      var isPartialTime = checkPartialTime(section);
+      // get the total times
+      var totalTimeTexts = getTimeTexts(section, false);
+      var totalTimeSeconds = textTimesToSeconds(totalTimeTexts);
+      var totalTime = secondsToTextTime(totalTimeSeconds);
 
-      // get the times
-      var timeTexts = getTimeTexts(section, isPartialTime);
+      // update the lecture time
+      totalLectureTime += totalTimeSeconds;
 
-      // sum the times
-      var timeToDisplay = sumTextTimes(timeTexts);
+      // initialize the text to display with the total time
+      var textToDisplay = totalTime;
 
-      // display time
-      var label = isPartialTime ? "Remaining Time - " : "Total Time - ";
+      // check if we need to display partial time
+      if (checkPartialTime(section)) {
+        // sum the partial times
+        var partialTimeTexts = getTimeTexts(section, true);
+        var partialTimeSeconds = textTimesToSeconds(partialTimeTexts);
+        var partialTime = secondsToTextTime(partialTimeSeconds);
 
-      displayTime(section, timeToDisplay, label);
+        // update the lecture time
+        remainingLectureTime += partialTimeSeconds;
+
+        // prepend partial time
+        textToDisplay = partialTime + ' / ' + textToDisplay
+      }
+
+      // check if we need to add up the total time to remaining time
+      if (getRemainingParts(section) == 0) {
+        remainingLectureTime += totalTimeSeconds;
+      }
+
+      // display the section text
+      displaySectionTime(section, textToDisplay);
     });
+
+    // display lecture totals
+    return displayLectureTimeProgress(totalLectureTime, remainingLectureTime)
+  }
+
+  function displayLectureTimeProgress(totalLectureTime, remainingLectureTime) {
+    // start with total
+    var displayText = secondsToTextTime(totalLectureTime);
+
+    // conditional add remaining
+    if (remainingLectureTime) {
+      displayText = secondsToTextTime(remainingLectureTime) + ' / ' + displayText;
+    }
+
+    // surround in parens
+    displayText = '(' + displayText + ')';
+
+    // add to DOM
+    var lectureProgressClass = 'lecture-progress-time';
+
+    var lectureProgressSpans = $(selectors.lectureProgress).find('.' + lectureProgressClass);
+    if (lectureProgressSpans.length > 0) {
+      $(lectureProgressSpans[0]).text(displayText);
+    } else {
+      $(selectors.lectureProgress).append('<span'
+        + ' class="'+ lectureProgressClass + '"'
+        + ' style="margin-left: 1em;"'
+        +'">'
+        + displayText + '</span>');
+    }
+
+    return displayText;
   }
 
   /*
@@ -70,6 +136,14 @@
     var sectionsToGo = sectionParts[0];
 
     return sectionsToGo != 0 && sectionsToGo != totalSections;
+  }
+
+  function getRemainingParts(section) {
+    // get the section parts
+    var sectionParts = getSectionParts(section);
+
+    // determine what times to get
+    return sectionParts[0];
   }
 
   /**
@@ -93,7 +167,7 @@
     return convertTimeSpansToTexts(timeSpans);
   }
 
-  function displayTime(section, totalTime, label) {
+  function displaySectionTime(section, displayText) {
     var sectionTimeClass = 'section-time';
 
     // prepend to lecture status
@@ -101,17 +175,15 @@
 
     // check to see if we've already added the time to the DOM
     if (totalTimeSpan.length > 0) {
-      $(totalTimeSpan[0]).text(label + totalTime);
+      $(totalTimeSpan[0]).text(displayText);
     } else {
       // we haven't, so create the element and add it
       $(section).find(selectors.lectureStatus)
-        .prepend('<span class="' +  sectionTimeClass + '" style="margin-right:1em">'+ label + totalTime + '</span>');
+        .prepend('<span class="' +  sectionTimeClass + '" style="margin-right:1em">'+ displayText + '</span>');
     }
   }
 
   function getSectionParts(section) {
-
-
     return $(section).find(selectors.lectureStatus).text()
       // split up the parts by "/"
       .split('/')
@@ -140,7 +212,7 @@
   }
 
   // get the summation of the times
-  function sumTextTimes(textTimes) {
+  function textTimesToSeconds(textTimes) {
     var totalSeconds = 0;
 
     // get total minutes
@@ -148,6 +220,10 @@
       totalSeconds += convertTextToSeconds(textTime);
     });
 
+    return totalSeconds;
+  }
+
+  function secondsToTextTime(totalSeconds) {
     // convert back to hh:mm
     var hours = Math.floor(totalSeconds / 60 / 60);
     var remainingTime = totalSeconds - hours * 60 * 60;
