@@ -2,7 +2,7 @@
 // @name         Udemy - show section time
 // @updateURL    https://openuserjs.org/meta/pedro-mass/My_Script.meta.js
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      1.1
 // @description  For Udemy, displays the time a section has ( remaining time / total time).
 // @copyright    2017, Pedro Mass (https://github.com/pedro-mass)
 // @author       pedro-mass
@@ -12,11 +12,6 @@
 // @require      https://greasyfork.org/scripts/5392-waitforkeyelements/code/WaitForKeyElements.js?version=115012
 // @run-at       document-idle
 // ==/UserScript==
-
-/**
-TODO
- - figure out how to stop this script from excuting continuously
-*/
 
 (function() {
   var selectors = {
@@ -83,7 +78,7 @@ TODO
       }
 
       // check if we need to add up the total time to remaining time
-      if (getRemainingParts(section) == 0) {
+      if (getRemainingParts(section) === 0) {
         remainingLectureTime += totalTimeSeconds;
       }
 
@@ -92,7 +87,10 @@ TODO
     });
 
     // display lecture totals
-    return displayLectureTimeProgress(totalLectureTime, remainingLectureTime);
+    displayLectureTimeProgress(totalLectureTime, remainingLectureTime);
+
+    // stops the script from running continuously
+    return false;
   }
 
   function displayLectureTimeProgress(totalLectureTime, remainingLectureTime) {
@@ -137,7 +135,7 @@ TODO
     var totalSections = sectionParts[1];
     var sectionsToGo = sectionParts[0];
 
-    return sectionsToGo != 0 && sectionsToGo != totalSections;
+    return sectionsToGo !== 0 && sectionsToGo != totalSections;
   }
 
   function getRemainingParts(section) {
