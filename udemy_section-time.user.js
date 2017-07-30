@@ -1,8 +1,7 @@
 // ==UserScript==
 // @name         Udemy - show section time
-// @updateURL    https://openuserjs.org/meta/pedro-mass/My_Script.meta.js
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  For Udemy, displays the time a section has ( remaining time / total time).
 // @copyright    2017, Pedro Mass (https://github.com/pedro-mass)
 // @author       pedro-mass
@@ -26,7 +25,7 @@
     lectureStatus: '.cur-status',
     lectureCheck: '.udi-check',
 
-    lectureProgress : 'div.detail__progress > div > div.fx > span',
+    lectureProgress : '#top-detail > div.detail__progress > div > div.fx',
   };
 
   // run();
@@ -112,7 +111,7 @@
     if (lectureProgressSpans.length > 0) {
       $(lectureProgressSpans[0]).text(displayText);
     } else {
-      $(selectors.lectureProgress).append(
+      $(selectors.lectureProgress + ' > div').before(
         '<span'
         + ' class="'+ lectureProgressClass + '"'
         + ' style="margin-left: 1em;"'
