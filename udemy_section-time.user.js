@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Udemy - show section time
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  For Udemy, displays the time a section has ( remaining time / total time).
 // @copyright    2017, Pedro Mass (https://github.com/pedro-mass)
 // @author       pedro-mass
@@ -13,19 +13,27 @@
 // ==/UserScript==
 
 (function() {
+  var $ = window.$;
+
+  var classes = {
+    sectionTime: "section-time"
+  };
+
   var selectors = {
-    sectionCard: 'curriculum-navigation-section',
-    sectionName: '.curriculum-navigation__section__title',
+    sectionCard: "[class^=section--section--] > .panel-body",
+    sectionHeader: "[class^=section--section-heading--]",
+    sectionTitle: "[class^=section--section-heading--] > h3",
+    sectionProgress: "[class^=section--section-heading--] > .text-secondary",
 
     // class needed by this user script
-    sectionTime: '.section-time',
+    sectionTime: "." + classes.sectionTime,
 
-    lectureItem: '.lecture__item',
-    lectureTime: '.lecture__item__link__time',
-    lectureStatus: '.cur-status',
-    lectureCheck: '.udi-check',
-
-    lectureProgress : '#top-detail > div.detail__progress > div > div.fx',
+    lectureItem: "[class^=curriculum-item--curriculum-item--]",
+    lectureTime: "[class^=curriculum-item--duration--]",
+    // lectureStatus: '.cur-status',
+    lectureStatus: "[class^=curriculum-item--progress]",
+    lectureProgress: "#top-detail > div.detail__progress > div > div.fx",
+    lectureCompleted: "[class^=curriculum-item--is-completed]"
   };
 
   // run();
@@ -46,10 +54,14 @@
 
     $.each(sections, function(index, section) {
       // remove previous time display
-      $(section).find(selectors.sectionTime).remove();
+      $(section)
+        .find(selectors.sectionTime)
+        .remove();
 
       // get the section title
-      var title = $(section).find(selectors.sectionName).text();
+      var title = $(section)
+        .find(selectors.sectionTitle)
+        .text();
 
       // get the total times
       var totalTimeTexts = getTimeTexts(section, false);
@@ -73,7 +85,7 @@
         remainingLectureTime += partialTimeSeconds;
 
         // prepend partial time
-        textToDisplay = partialTime + ' / ' + textToDisplay;
+        textToDisplay = partialTime + " / " + textToDisplay;
       }
 
       // check if we need to add up the total time to remaining time
@@ -98,25 +110,31 @@
 
     // conditional add remaining
     if (remainingLectureTime) {
-      displayText = secondsToTextTime(remainingLectureTime) + ' / ' + displayText;
+      displayText =
+        secondsToTextTime(remainingLectureTime) + " / " + displayText;
     }
 
     // surround in parens
-    displayText = '(' + displayText + ')';
+    displayText = "(" + displayText + ")";
 
     // add to DOM
-    var lectureProgressClass = 'lecture-progress-time';
+    var lectureProgressClass = "lecture-progress-time";
 
-    var lectureProgressSpans = $(selectors.lectureProgress).find('.' + lectureProgressClass);
+    var lectureProgressSpans = $(selectors.lectureProgress).find(
+      "." + lectureProgressClass
+    );
     if (lectureProgressSpans.length > 0) {
       $(lectureProgressSpans[0]).text(displayText);
     } else {
-      $(selectors.lectureProgress + ' > div').before(
-        '<span'
-        + ' class="'+ lectureProgressClass + '"'
-        + ' style="margin-left: 1em;"'
-        +'">'
-        + displayText + '</span>'
+      $(selectors.lectureProgress + " > div").before(
+        "<span" +
+          ' class="' +
+          lectureProgressClass +
+          '"' +
+          ' style="margin-left: 1em;"' +
+          '">' +
+          displayText +
+          "</span>"
       );
     }
 
@@ -156,7 +174,9 @@
     // Check for partial time
     if (isPartialTime) {
       // filter down to just the non-completed ones
-      $lectures = $lectures.filter(':not(.completed)');
+      $lectures = $lectures.filter((index, element) => {
+        return $(element).has(selectors.lectureCompleted).length === 0;
+      });
     }
 
     // get the time spans
@@ -167,33 +187,45 @@
   }
 
   function displaySectionTime(section, displayText) {
-    var sectionTimeClass = 'section-time';
+    var sectionTimeClass = classes.sectionTime;
 
     // prepend to lecture status
-    var totalTimeSpan = $(section).find(selectors.lectureStatus).find(sectionTimeClass);
+    var location = $(section).find(selectors.sectionHeader);
+    var totalTimeSpan = location.find(sectionTimeClass);
 
     // check to see if we've already added the time to the DOM
     if (totalTimeSpan.length > 0) {
       $(totalTimeSpan[0]).text(displayText);
     } else {
       // we haven't, so create the element and add it
-      $(section).find(selectors.lectureStatus)
-        .prepend('<span class="' +  sectionTimeClass + '" style="margin-right:1em">'+ displayText + '</span>');
+      location.prepend(
+        '<span class="' +
+          sectionTimeClass +
+          '" style="position:absolute;right:10%">' +
+          displayText +
+          "</span>"
+      );
     }
   }
 
   function getSectionParts(section) {
-    return $(section).find(selectors.lectureStatus).text()
-      // split up the parts by "/"
-      .split('/')
-      // trim up the space
-      .map(function(text) { return text.trim(); });
+    return (
+      $(section)
+        .find(selectors.sectionProgress)
+        .text()
+        // split up the parts by "/"
+        .split("/")
+        // trim up the space
+        .map(function(text) {
+          return text.trim();
+        })
+    );
   }
 
   function convertTimeSpansToTexts(timeSpans) {
     var timeTexts = [];
 
-    for (var i=0; i<timeSpans.length; i++) {
+    for (var i = 0; i < timeSpans.length; i++) {
       timeTexts.push($(timeSpans[i]).text());
     }
 
@@ -201,7 +233,9 @@
   }
 
   function convertTextToSeconds(textTime) {
-    var timeParts = textTime.split(':');
+    if (!textTime || textTime.trim().length === 0) return 0;
+
+    var timeParts = textTime.split(":");
 
     var seconds = parseInt(timeParts[1]);
 
@@ -235,11 +269,11 @@
 
   // get the time in the following format -> hh:mm:ss
   function getTime(hours, minutes, seconds) {
-    var result = '';
+    var result = "";
 
     // get the hours part
     if (hours > 0) {
-      result += hours + ':';
+      result += hours + ":";
 
       result += timePad(minutes);
     } else {
@@ -249,10 +283,10 @@
 
     // check for minutes
     if (minutes > 0) {
-      result += ':' + timePad(seconds);
+      result += ":" + timePad(seconds);
     } else {
       // we didn't have any minutes, but we should say 0
-      result += '0:' + timePad(seconds);
+      result += "0:" + timePad(seconds);
     }
 
     return result;
@@ -260,10 +294,10 @@
 
   // time should be a length of 2, so prepend with 0
   function timePad(timeSegment) {
-    var result = timeSegment + '';
+    var result = timeSegment + "";
 
     while (result.length < 2) {
-      result = '0' + result;
+      result = "0" + result;
     }
 
     return result;
